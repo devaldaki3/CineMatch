@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Top {{genre_name}} Movies</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='style.css') }}">
+  <script type="text/javascript">
+    var films = {{suggestions|tojson}};
+    var genreId = '{{genre_id}}';
+    var genreName = '{{genre_name}}';
+  </script>
+</head>
+
+<body id="content" style="font-family: 'Noto Sans JP', sans-serif;">
+  <div id="loader"></div>
+  <div class="ml-container" style="display: block;">
+    <center>
+      <h1 title="Click to go back to Home Page" onclick="window.location.href='/'" style="cursor: pointer; margin-top: 30px; font-weight: bold;">
+        <i class="fa fa-home" style="color: white; margin-right: 15px;"></i>{{genre_name}} Movies
+      </h1>
+    </center>
+    
+    <div id="genre-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; padding: 40px; margin: 0 auto;">
+       <!-- Movies will load here -->
+    </div>
+  </div>
+  
+  <div class="fail">
+    <center><h3>Sorry! The Requested Movie is not in our Database</h3></center>
+  </div>
+  
+  <div class="results">
+    <center><h2 id="name" class="text-uppercase"></h2></center>
+  </div>
+
+  <input type="hidden" id="autoComplete">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='recommend.js')}}"></script>
+  
+  <script>
+    $(document).ready(function(){
+      var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
+      
+      var lower_films = films.map(f => f.toLowerCase());
+      var genreHtml = "";
+      var count = 0;
+
+      function fetchGenre(page) {
+          if (count >= 24) return; // Fetch 24 movies for a full grid page
+          var genre_url = 'https://api.themoviedb.org/3/discover/movie?api_key=' + my_api_key + '&with_genres=' + genreId + '&sort_by=popularity.desc&page=' + page;
+          
+          $.ajax({
+            type: 'GET',
+            url: genre_url,
+            success: function(response){
+              var movies = response.results;
+              
+              for(var i=0; i<movies.length; i++){
+                if(count >= 24) break; 
+                
+                var movie = movies[i];
+                var title = movie.title || movie.original_title;
+                
+                if(lower_films.includes(title.toLowerCase()) && movie.poster_path){
+                  var poster_url = "https://image.tmdb.org/t/p/original" + movie.poster_path;
+                  
+                  genreHtml += `
+                    <div class="card" style="width: 15rem; margin-bottom: 20px;" title="${title}" onclick="recommendcard(this)">
+                      <div class="imghvr">
+                        <img class="card-img-top" height="360" width="240" alt="${title} - poster" src="${poster_url}">
+                        <figcaption class="fig">
+                          <button class="card-btn btn btn-danger"> Click Me </button>
+                        </figcaption>
+                      </div>
+                      <div class="card-body">
+                        <h5 class="card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;">${title}</h5>
+                      </div>
+                    </div>
+                  `;
+                  count++;
+                }
+              }
+              $('#genre-grid').html(genreHtml);
+
+              // Limit max api calls to reasonable depth
+              if (count < 24 && page < 25) {
+                fetchGenre(page + 1);
+              }
+            },
+            error: function(){
+              if(count === 0 && page === 1) $('#genre-grid').html('<p style="color: white; font-style: italic;">Could not load genre movies at the moment.</p>');
+            }
+          });
+      }
+      
+      fetchGenre(1);
+    });
+  </script>
+</body>
+</html>

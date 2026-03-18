@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CineMatch</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@7.2.0/dist/css/autoComplete.min.css">
+  <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='style.css') }}">
+  <script type="text/javascript">
+    var films = {{suggestions|tojson}};
+  </script>
+  <style>
+    /* Hide scrollbars for the horizontal movie carousels */
+    #trending-movies-list::-webkit-scrollbar, #genre-movies-list::-webkit-scrollbar {
+      display: none;
+    }
+    #trending-movies-list, #genre-movies-list {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+  </style>
+</head>
+
+<body id="content" style="font-family: 'Noto Sans JP', sans-serif;">
+  <div id="loader"></div>
+	<div class="ml-container" style="display: block;">
+    <center><h1 style="">CineMatch</h1></center>
+    <div class="form-group shadow-textarea" style="margin-top: 30px;text-align: center;color: white;">
+        <input type="text" name="movie" class="movie form-control" id="autoComplete" autocomplete="off" placeholder="Enter the Movie Name" style="background-color: #ffffff;border-color:#ffffff;width: 60%;color: #181818" required="required" />
+        <br>
+    </div>
+
+    <div class="form-group" style="text-align: center;">
+      <button class="btn btn-primary btn-block movie-button" style="background-color: #e50914;text-align: center;border-color: #e50914;width:120px;" disabled="true" >Search</button><br><br>
+    </div>
+
+    <!-- Genres Catalog Section -->
+    <div class="genres-container" style="margin-top: 5px; text-align: center; width: 85%; margin-left: auto; margin-right: auto;">
+      <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; padding: 10px;">
+        <a href="/genre?id=28&name=Action%20%26%20Adventure" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Action / Adventure</a>
+        <a href="/genre?id=35&name=Comedy" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Comedy</a>
+        <a href="/genre?id=27&name=Horror" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Horror</a>
+        <a href="/genre?id=878&name=Sci-Fi" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Sci-Fi</a>
+        <a href="/genre?id=10749&name=Romance" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Romance</a>
+        <a href="/genre?id=53&name=Thriller" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Thriller</a>
+      </div>
+    </div>
+    
+    <!-- Trending Movies Section -->
+    <div class="trending-container" style="position: relative; margin-top: 40px; text-align: center; width: 85%; margin-left: auto; margin-right: auto;">
+      <h3 style="color: white; margin-bottom: 25px; text-align: left; padding-left: 20px; font-weight: bold; font-family: 'Noto Sans JP', sans-serif;">🔥 Trending Movies</h3>
+      
+      <!-- Left Carousel Button -->
+      <button id="scroll-left-btn" style="position: absolute; left: -25px; top: 60%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; font-size: 2rem; color: white; cursor: pointer; border-radius: 50%; width: 50px; height: 50px; z-index: 10; display: flex; align-items: center; justify-content: center; transition: all 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';">
+         <i class="fa fa-angle-left"></i>
+      </button>
+
+      <div id="trending-movies-list" style="display: flex; overflow-x: auto; flex-wrap: nowrap; gap: 20px; padding: 15px 20px; text-align: left; justify-content: flex-start; scroll-behavior: smooth;">
+        <!-- Movies loaded here via JS -->
+      </div>
+      
+      <!-- Right Carousel Button -->
+      <button id="scroll-right-btn" style="position: absolute; right: -25px; top: 60%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; font-size: 2rem; color: white; cursor: pointer; border-radius: 50%; width: 50px; height: 50px; z-index: 10; display: flex; align-items: center; justify-content: center; transition: all 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';">
+         <i class="fa fa-angle-right"></i>
+      </button>
+    </div>
+	</div>
+
+  <div class="fail">
+    <center><h3>Sorry! The Requested Movie is not in our Database</h3></center>
+  </div>
+
+	<div class="results">
+    <center>
+      <h2 id="name" class="text-uppercase"></h2>
+    </center>
+	</div>
+	<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@7.2.0/dist/js/autoComplete.min.js"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='autocomplete.js')}}"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script type="text/javascript" src="{{url_for('static', filename='recommend.js')}}"></script>
+  
+  <script>
+    $(document).ready(function(){
+      var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
+      
+      // Convert dataset films to lowercase for exact case-insensitive matching
+      var lower_films = films.map(f => f.toLowerCase());
+      
+      var trendingHtml = "";
+      var count = 0;
+
+      function fetchTrending(page) {
+          if (count >= 15) return; // Display max 15 movies for scroll
+          var trending_url = 'https://api.themoviedb.org/3/movie/popular?api_key=' + my_api_key + '&page=' + page;
+          
+          $.ajax({
+            type: 'GET',
+            url: trending_url,
+            success: function(response){
+              var movies = response.results;
+              
+              for(var i=0; i<movies.length; i++){
+                if(count >= 15) break; 
+                
+                var movie = movies[i];
+                var title = movie.title || movie.original_title;
+                
+                // ONLY append if the movie exists in our local dataset 'films' variable
+                if(lower_films.includes(title.toLowerCase()) && movie.poster_path){
+                  var poster_url = "https://image.tmdb.org/t/p/original" + movie.poster_path;
+                  
+                  trendingHtml += `
+                    <div class="card" style="width: 15rem; flex: 0 0 auto; margin-bottom: 15px;" title="${title}" onclick="recommendcard(this)">
+                      <div class="imghvr">
+                        <img class="card-img-top" height="360" width="240" alt="${title} - poster" src="${poster_url}">
+                        <figcaption class="fig">
+                          <button class="card-btn btn btn-danger"> Click Me </button>
+                        </figcaption>
+                      </div>
+                      <div class="card-body">
+                        <h5 class="card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;">${title}</h5>
+                      </div>
+                    </div>
+                  `;
+                  count++;
+                }
+              }
+              $('#trending-movies-list').html(trendingHtml);
+              
+              // Recursively fetch next page if we haven't found valid movies yet (limit to page 10)
+              if (count < 15 && page < 10) {
+                fetchTrending(page + 1);
+              }
+            },
+            error: function(){
+              // Only display error if NO movies were generated at all
+              if(count === 0 && page === 1) $('#trending-movies-list').html('<p style="color: white; font-style: italic;">Could not load trending movies at the moment.</p>');
+            }
+          });
+      }
+      
+      fetchTrending(1);
+      
+      // Carousel scroll event listeners for Trending
+      $('#scroll-left-btn').click(function(){
+        document.getElementById('trending-movies-list').scrollBy({ left: -600, behavior: 'smooth' });
+      });
+      
+      $('#scroll-right-btn').click(function(){
+        document.getElementById('trending-movies-list').scrollBy({ left: 600, behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
