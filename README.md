@@ -8,12 +8,7 @@
 [![Scikit-Learn](https://img.shields.io/badge/Machine%20Learning-Scikit--Learn-F7931E.svg)](https://scikit-learn.org/)
 [![TMDb API](https://img.shields.io/badge/Data-TMDb%20API-01B4E4.svg)](https://www.themoviedb.org/)
 
-<br>
 
-## 📸 Demo
-![CineMatch Demo](static/demo.gif)
-
-<br>
 
 *A mobile-ready web application that curates precise movie suggestions using a custom hybrid scoring algorithm, while dynamically analyzing the sentiment of real-time viewer reviews via Natural Language Processing (NLP).*
 
