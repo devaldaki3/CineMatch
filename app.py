@@ -1,54 +1,100 @@
 import json
 import pickle
 import requests
-import bs4 as bs
 import numpy as np
 import pandas as pd
-# Reloading the server to fetch newly generated ML Pickles
-import urllib.request
 from flask import Flask, render_template, request
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import CountVectorizer
+import scipy.sparse as sp
 
-# loading the dataset and the trained model
+# Load models and dataset at startup
 try:
-    clf = pickle.load(open("Artifacts/nlp_model.pkl", 'rb'))
-    vectorizer = pickle.load(open("Artifacts/tranform.pkl",'rb'))
+    clf = pickle.load(open("models/nlp_model.pkl", 'rb'))
+    vectorizer = pickle.load(open("models/tranform.pkl",'rb'))
+    
+    movies_dict = pickle.load(open('models/movie_dict.pkl', 'rb'))
+    data = pd.DataFrame(movies_dict)
+    
+    # Using sparse vectors + on-the-fly cosine similarity
+    similarity_matrix = sp.load_npz('models/vectors.npz')
+    print("Models loaded successfully.")
 except Exception as e:
-    print(f"Error in loading Artifacts: {e}")
+    print(f"Error loading models: {e}")
 
-# creating a similarity matrix using count vectorizer and cosine similarity
-def create_similarity():
-    try:
-        data = pd.read_csv("Artifacts/main_data.csv")
-        cv = CountVectorizer()
-        count_matrix = cv.fit_transform(data['comb']) 
-        similarity = cosine_similarity(count_matrix)
-        return data,similarity
-    except Exception as e:
-        print(e)
-
-def rcmd(m):
+def rcmd(m, tmdb_id=None):
     m = m.lower()
     try:
-        data.head()
-        similarity.shape 
-    except:
-        data, similarity = create_similarity()
-    if m not in data['movie_title'].unique():
-        return('Sorry! The movie you requested is not in our database. Please check the spelling or try with some other movies')
-    else:
-        i = data.loc[data['movie_title']==m].index[0]
-        lst = list(enumerate(similarity[i]))
-        lst = sorted(lst, key = lambda x:x[1] ,reverse=True)
-        lst = lst[1:11] # excluding first item since it is the requested movie itself
+        # Prefer TMDB ID match for accuracy; fallback to title search
+        if tmdb_id is not None and str(tmdb_id).strip().lower() not in ["", "null", "undefined", "none"]:
+            try:
+                tmdb_id_int = int(tmdb_id)
+                if tmdb_id_int not in data['movie_id'].values:
+                    return('__NOT_IN_DB__')
+                else:
+                    i = data[data['movie_id'] == tmdb_id_int].index[0]
+            except ValueError:
+                return('__NOT_IN_DB__')
+        else:
+            titles_lower = data['title'].str.lower().tolist()
+            if m not in titles_lower:
+                return('__NOT_IN_DB__')
+            else:
+                i = titles_lower.index(m)
+        
+        target_lang = data.iloc[i]['original_language']
+        
+        # Compute cosine similarity on-the-fly
+        sim_scores = cosine_similarity(similarity_matrix[i], similarity_matrix).flatten()
+        lst = list(enumerate(sim_scores))
+            
+        # Enterprise Hybrid Scoring Math
+        def calculate_hybrid_score(item):
+            movie_index = item[0]
+            cosine_sim = item[1]
+            
+            try:
+                vote = float(data.iloc[movie_index]['vote_average'])
+            except:
+                vote = 5.0
+                
+            # Hybrid: 75% content similarity + 25% popularity
+            hybrid = (cosine_sim * 0.75) + ((vote / 10.0) * 0.25)
+            return hybrid
+            
+        lst = sorted(lst, key=calculate_hybrid_score, reverse=True)
+        
+        # Top 3000 pool to ensure enough same-language matches
+        search_pool = lst[1:3000]
+        
         l = []
-        for i in range(len(lst)):
-            a = lst[i][0]
-            l.append(data['movie_title'][a])
+        # Phase 1: Same-language recommendations
+        for item in search_pool:
+            a = item[0]
+            rec_title = data.iloc[a]['title']
+            rec_lang = data.iloc[a]['original_language']
+            
+            if rec_title.lower() != m and rec_lang == target_lang:
+                l.append(rec_title)
+            
+            if len(l) == 10:
+                break
+                
+        # Phase 2: Fill remaining slots with any language if needed
+        if len(l) < 10:
+            for item in search_pool:
+                a = item[0]
+                rec_title = data.iloc[a]['title']
+                if rec_title.lower() != m and rec_title not in l:
+                    l.append(rec_title)
+                if len(l) == 10:
+                    break
+                    
         return l
-    
-# converting list of string to list (eg. "["abc","def"]" to ["abc","def"])
+    except Exception as e:
+        print("rcmd error: ", e)
+        return []
+
+# Converting string like '["abc","def"]' to a proper Python list
 def convert_to_list(my_list):
     my_list = my_list.split('","')
     my_list[0] = my_list[0].replace('["','')
@@ -56,8 +102,10 @@ def convert_to_list(my_list):
     return my_list
 
 def get_suggestions():
-    data = pd.read_csv('Artifacts/main_data.csv')
-    return list(data['movie_title'].str.capitalize())
+    try:
+        return list(data['title'].str.capitalize())
+    except:
+        return []
 
 app = Flask(__name__)
 
@@ -77,7 +125,8 @@ def genre():
 @app.route("/similarity",methods=["POST"])
 def similarity():
     movie = request.form['name']
-    rc = rcmd(movie)
+    movie_id = request.form.get('movie_id')
+    rc = rcmd(movie, movie_id)
     if type(rc)==type('string'):
         return rc
     else:
@@ -106,6 +155,8 @@ def recommend():
     status = request.form['status']
     rec_movies = request.form['rec_movies']
     rec_posters = request.form['rec_posters']
+    rec_ids = request.form.get('rec_ids', '[]')
+    not_in_db = request.form.get('not_in_db', '0') == '1'
 
     # get movie suggestions for auto complete
     suggestions = get_suggestions()
@@ -113,6 +164,11 @@ def recommend():
     # call the convert_to_list function for every string that needs to be converted to list
     rec_movies = convert_to_list(rec_movies)
     rec_posters = convert_to_list(rec_posters)
+    # Parse rec_ids (JSON list of ints/strings)
+    try:
+        rec_ids_list = json.loads(rec_ids)
+    except:
+        rec_ids_list = ['' for _ in rec_movies]
     cast_names = convert_to_list(cast_names)
     cast_chars = convert_to_list(cast_chars)
     cast_profiles = convert_to_list(cast_profiles)
@@ -129,14 +185,14 @@ def recommend():
     for i in range(len(cast_bios)):
         cast_bios[i] = cast_bios[i].replace(r'\n', '\n').replace(r'\"','\"')
     
-    # combining multiple lists as a dictionary which can be passed to the html file so that it can be processed easily and the order of information will be preserved
-    movie_cards = {rec_posters[i]: rec_movies[i] for i in range(len(rec_posters))}
+    # Build movie cards dict: (poster, id) -> title
+    movie_cards = {(rec_posters[i], str(rec_ids_list[i]) if i < len(rec_ids_list) else ''): rec_movies[i] for i in range(len(rec_posters))}
     
     casts = {cast_names[i]:[cast_ids[i], cast_chars[i], cast_profiles[i]] for i in range(len(cast_profiles))}
 
     cast_details = {cast_names[i]:[cast_ids[i], cast_profiles[i], cast_bdays[i], cast_places[i], cast_bios[i]] for i in range(len(cast_places))}
 
-    # Fetching reviews from TMDB API instead of scraping IMDB
+    # Fetching reviews from TMDB API
     reviews_list = []
     reviews_status = []
     try:
@@ -149,7 +205,7 @@ def recommend():
                 review_text = review.get('content', '')
                 if review_text:
                     try:
-                        # passing the review to our model
+                        # passing the review to the model
                         movie_review_list = np.array([review_text])
                         movie_vector = vectorizer.transform(movie_review_list)
                         pred = clf.predict(movie_vector)
@@ -160,13 +216,13 @@ def recommend():
     except Exception as e:
         print("Error fetching TMDB reviews:", e)
 
-    # combining reviews and comments into a dictionary
+    # combining reviews into a dictionary
     movie_reviews = {reviews_list[i]: reviews_status[i] for i in range(len(reviews_list))}     
 
     # passing all the data to the html file
     return render_template('recommend.html',title=title,poster=poster,overview=overview,vote_average=vote_average,
         vote_count=vote_count,release_date=release_date,runtime=runtime,status=status,genres=genres,
-        movie_cards=movie_cards,reviews=movie_reviews,casts=casts,cast_details=cast_details)
+        movie_cards=movie_cards,reviews=movie_reviews,casts=casts,cast_details=cast_details,not_in_db=not_in_db)
 
 if __name__ == '__main__':
     app.run(debug=True,host="0.0.0.0",port=5000)

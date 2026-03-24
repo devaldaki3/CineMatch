@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>NEW</title>
+	<title>CineMatch - Recommendations</title>
+	<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 	<link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
@@ -64,14 +65,15 @@
             </p>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+          <button type="button" class="btn btn-danger" onclick="window.loadActorView({{details[0]}}, '{{name}}')">Show More Movies of {{name}}</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
   </div>
   {% endfor %}
-  
+
   {% if casts|length > 1 %}
   <div class="movie" style="color: #E8E8E8;">
     	<center>
@@ -98,48 +100,25 @@
     </div>
 {% endif %}
 
-  <center>
-    {% if reviews|length > 0 %}
-    <h2 style="color:white">USER REVIEWS</h2>
-     <div class="table-responsive" style="max-width: 85%; margin: 0 auto; margin-top:25px;">
-        <table class="table table-bordered" bordercolor="white" style="color:white; background-color: #1a1a1a;">
-            <thead style="background-color: #000;">
-                <tr>
-                    <th class="text-center" scope="col" style="width: 75%">Comments</th>
-                    <th class="text-center" scope="col">Sentiments</th>
-                </tr>
-            </thead>
-    
-            <tbody>
-		      {% for review, status in reviews.items() if not reviews.hidden %}
-		      <tr style="background-color: #2b2b2b;">
-              	  <td style="padding: 20px; text-align: left;">{{review}}</td>
-	              <td style="vertical-align: middle;"><center>
-	                  <span class="badge badge-{% if status == 'Good' %}success{% else %}danger{% endif %}" style="font-size: 16px; padding: 10px;">{{status}}</span>
-	                </center>
-	              </td>
-          		</tr>
-      			{% endfor %}
-    		</tbody>
- 		 </table>
-    </div>
-    {% else %}
-    <div style="color:white;">
-      <!-- <h1 style="color:white"> This movie is not released yet. Stay tuned! </h1> -->
-    </div>
-    {% endif %}
-  </center>
-
-      {% if movie_cards|length > 1 %}
-
+      {% if not_in_db %}
+      <div class="movie" style="color: #E8E8E8; text-align: center; margin: 30px auto; max-width: 600px;">
+        <div style="background: rgba(229, 9, 20, 0.08); border: 1px solid rgba(229, 9, 20, 0.3); border-radius: 16px; padding: 28px 32px;">
+          <i class="fa fa-database" style="font-size: 2.5rem; color: #e50914; margin-bottom: 14px; display: block;"></i>
+          <h4 style="color: white; font-weight: 700; margin-bottom: 10px;">Not in Our Database</h4>
+          <p style="color: #aaa; font-size: 0.97rem; margin: 0;">This movie is not part of our database, so we can't suggest similar movies.</p>
+        </div>
+      </div>
+      {% elif movie_cards|length > 1 %}
 
       <div class="movie" style="color: #E8E8E8;">
       <center><h3>RECOMMENDED MOVIES FOR YOU</h3><h5>(Click any of the movies to get recommendation)</h5></center>
     </div>
 
     <div class="movie-content">
-      {% for poster, title in movie_cards.items() if not movie_cards.hidden %}
-        <div class="card" style="width: 15rem;" title="{{title}}" onclick="recommendcard(this)">
+      {% for poster_id_pair, title in movie_cards.items() if not movie_cards.hidden %}
+        {% set poster = poster_id_pair[0] %}
+        {% set tmdb_id = poster_id_pair[1] %}
+        <div class="card" style="width: 15rem;" title="{{title}}" data-id="{{tmdb_id}}" onclick="recommendcard(this)">
           <div class="imghvr">
             <img class="card-img-top" height="360" width="240" alt="{{title}} - poster" src={{poster}}>
             <figcaption class="fig">
@@ -152,8 +131,63 @@
         </div>
     {% endfor %}
     </div>
-
     {% endif %}
+
+  <center>
+    {% if reviews|length > 0 %}
+    <h2 style="color:white; margin-top: 30px; margin-bottom: 20px;">USER REVIEWS</h2>
+    <div id="reviews-container" style="max-width: 85%; margin: 0 auto; margin-bottom: 40px; text-align: left;">
+      {% for review, status in reviews.items() if not reviews.hidden %}
+      <div class="card review-card {% if loop.index0 >= 3 %}d-none extra-review{% endif %}" style="background-color: #1a1a1a; margin-bottom: 15px; border: 1px solid #333; border-radius: 10px;">
+        <div class="card-body">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div style="color: #888; margin: 0; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+              <i class="fa fa-user-circle" style="font-size: 1.1rem;"></i> <span>Anonymous User</span>
+            </div>
+            <div style="font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; display: flex; align-items: center; gap: 5px; {% if status == 'Good' %}color: #2ecc71; background: rgba(46, 204, 113, 0.1); border: 1px solid rgba(46, 204, 113, 0.3);{% else %}color: #fc4a55; background: rgba(252, 74, 85, 0.1); border: 1px solid rgba(252, 74, 85, 0.3);{% endif %}">
+              {% if status == 'Good' %}<i class="fa fa-thumbs-up"></i> Positive{% else %}<i class="fa fa-thumbs-down"></i> Negative{% endif %}
+            </div>
+          </div>
+          <p class="review-text" style="color: #ccc; margin-bottom: 15px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+            {{review}}
+          </p>
+          <button class="btn btn-sm btn-outline-light read-more-btn" onclick="
+            var p = this.previousElementSibling; 
+            if(p.style.webkitLineClamp == '3' || !p.style.webkitLineClamp) { 
+              p.style.webkitLineClamp = 'unset'; 
+              this.innerText = 'Read Less'; 
+            } else { 
+              p.style.webkitLineClamp = '3'; 
+              this.innerText = 'Read More'; 
+            }
+          ">Read More</button>
+        </div>
+      </div>
+      {% endfor %}
+      
+      {% if reviews|length > 3 %}
+      <div style="text-align: center; margin-top: 25px;">
+        <button id="view-more-reviews-btn" data-expanded="false" class="btn" style="color: #fff; text-decoration: none; font-size: 1rem; align-items: center; justify-content: center; gap: 8px; font-weight: 600; background: #222; padding: 10px 24px; border-radius: 25px; border: 1px solid #444; transition: all 0.3s ease; display: inline-flex; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);" onmouseover="this.style.background='#e50914'; this.style.border='1px solid #e50914'; this.style.boxShadow='0 4px 10px rgba(229, 9, 20, 0.4)';" onmouseout="this.style.background='#222'; this.style.border='1px solid #444'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.3)';" onclick="
+          var expanded = this.getAttribute('data-expanded') === 'true';
+          if (expanded) {
+            document.querySelectorAll('.extra-review').forEach(function(el) { el.classList.add('d-none'); });
+            this.innerHTML = 'View More Reviews <i class=\'fa fa-angle-down\' style=\'margin-left: 5px; font-size: 1.1rem;\'></i>';
+            this.setAttribute('data-expanded', 'false');
+          } else {
+            document.querySelectorAll('.extra-review').forEach(function(el) { el.classList.remove('d-none'); });
+            this.innerHTML = 'View Less Reviews <i class=\'fa fa-angle-up\' style=\'margin-left: 5px; font-size: 1.1rem;\'></i>';
+            this.setAttribute('data-expanded', 'true');
+            setTimeout(checkReviewLengths, 50);
+          }
+        ">View More Reviews <i class="fa fa-angle-down" style="margin-left: 5px; font-size: 1.1rem;"></i></button>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div style="color:white;">
+    </div>
+    {% endif %}
+  </center>
 
     
     </div>
@@ -163,5 +197,23 @@
   <script type="text/javascript" src="{{url_for('static', filename='recommend.js')}}"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  <script>
+    function checkReviewLengths() {
+      document.querySelectorAll('.review-card').forEach(function(card) {
+        if(card.classList.contains('d-none')) return;
+        var p = card.querySelector('.review-text');
+        var btn = card.querySelector('.read-more-btn');
+        if (!p || !btn) return;
+        
+        if (p.scrollHeight <= p.clientHeight) {
+          btn.style.display = 'none';
+        } else if (btn.innerText === 'Read More') {
+          btn.style.display = 'inline-block';
+        }
+      });
+    }
+    setTimeout(checkReviewLengths, 100);
+    window.addEventListener('resize', checkReviewLengths);
+  </script>
 </body>
 </html>

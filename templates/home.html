@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>CineMatch</title>
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
@@ -10,48 +11,173 @@
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@7.2.0/dist/css/autoComplete.min.css">
   <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="text/javascript">
     var films = {{suggestions|tojson}};
   </script>
   <style>
-    /* Hide scrollbars for the horizontal movie carousels */
     #trending-movies-list::-webkit-scrollbar, #genre-movies-list::-webkit-scrollbar {
       display: none;
     }
     #trending-movies-list, #genre-movies-list {
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
+      -ms-overflow-style: none;  
+      scrollbar-width: none;  
     }
   </style>
+  <script type="text/javascript">
+    function restoreHomeView() {
+      var isLookingAtResults = $('.results').is(':visible') && $('.results').children().length > 0;
+      
+      if (isLookingAtResults) {
+          $('.results').empty().hide();
+          $('.fail').hide();
+          $('.genres-container').fadeIn(300);
+          
+          if (window.genreId || window.actorId) {
+             $('#home-genre-section').fadeIn(300);
+             $('#home-btn').fadeIn(300).css('display', 'flex'); 
+             $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
+          } else {
+             $('.trending-container').fadeIn(300);
+             $('#home-btn').hide();
+             $('#direct-home-btn').hide();
+          }
+      } else if (window.actorId) {
+          window.actorId = null;
+          
+          if (window.previousGenreId) {
+              window.genreId = window.previousGenreId;
+          }
+          
+          $('#home-genre-section').hide();
+          $('.results').fadeIn(300); 
+          $('#home-btn').fadeIn(300).css('display', 'flex'); 
+          
+      } else {
+          window.genreId = null; 
+          window.actorId = null;
+          
+          $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
+          
+          $('#home-genre-section').hide();
+          $('.trending-container').fadeIn(300);
+          $('#home-btn').hide();
+      }
+      
+      // Reset the search input value completely in all cases!
+      $('.movie').val('');
+      $('html, body').animate({scrollTop: 0}, 'fast');
+    }
+  </script>
 </head>
 
 <body id="content" style="font-family: 'Noto Sans JP', sans-serif;">
   <div id="loader"></div>
+  <div style="position: sticky; top: 15px; left: 15px; z-index: 1000; display: flex; gap: 10px; width: fit-content;">
+    <!-- Smart Back Button -->
+    <button id="home-btn" class="btn btn-dark" style="display: none; border-radius: 50%; font-size: 1.1rem; font-weight: bold; background-color: rgba(0,0,0,0.8); border: 1px solid #555; align-items: center; justify-content: center; width: 45px; height: 45px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s;" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';" onclick="restoreHomeView()" title="Go Back">
+      <i class="fa fa-arrow-left"></i>
+    </button>
+    <!-- Direct Home Button -->
+    <button id="direct-home-btn" class="btn btn-dark" style="display: none; border-radius: 50%; font-size: 1.2rem; font-weight: bold; background-color: rgba(0,0,0,0.8); border: 1px solid #555; align-items: center; justify-content: center; width: 45px; height: 45px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s;" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';" onclick="goDirectlyHome()" title="Go to Home">
+      <i class="fa fa-home"></i>
+    </button>
+  </div>
 	<div class="ml-container" style="display: block;">
-    <center><h1 style="">CineMatch</h1></center>
-    <div class="form-group shadow-textarea" style="margin-top: 30px;text-align: center;color: white;">
-        <input type="text" name="movie" class="movie form-control" id="autoComplete" autocomplete="off" placeholder="Enter the Movie Name" style="background-color: #ffffff;border-color:#ffffff;width: 60%;color: #181818" required="required" />
-        <br>
+    <center><h1 style="margin-bottom: 20px;">CineMatch</h1></center>
+    <div class="form-group shadow-textarea" style="text-align: center; color: white; margin-bottom: 25px;">
+        <div style="position: relative; display: inline-block; width: 60%; margin: 0 auto; text-align: left;">
+            <input type="text" name="movie" class="movie form-control" id="autoComplete" autocomplete="off" placeholder="Enter the Movie Name" style="background-color: #ffffff;border-color:#ffffff;width: 100%;color: #181818;" required="required" />
+            
+            <!-- Tooltip Container placed safely OUTSIDE the input -->
+            <div class="app-tooltip-container" style="position: absolute; right: -32px; top: 8px;">
+                <i class="fa fa-info-circle" style="color: rgba(255,255,255,0.7); font-size: 1.4rem; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" onclick="toggleHybridTooltip(event)"></i>
+                
+                <!-- Sleek Dark Theme Hybrid Tooltip -->
+                <div id="movie-info-tooltip" class="app-tooltip-text" style="visibility: hidden; position: absolute; top: 35px; left: 50%; transform: translateX(-50%); background-color: #1e1e1e; color: #eaeaea; width: 260px; padding: 10px 15px; border-radius: 6px; font-size: 0.85rem; white-space: normal; line-height: 1.4; box-shadow: 0 8px 20px rgba(0,0,0,0.8); border: 1px solid #333; opacity: 0; transition: opacity 0.2s ease-in-out; z-index: 1000; font-weight: normal; text-align: center;">
+                    Search a movie you liked to get similar ones!
+                    <!-- Outer border arrow -->
+                    <div class="arrow-outer" style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border-width: 7px; border-style: solid; border-color: transparent transparent #333 transparent;"></div>
+                    <!-- Inner color arrow -->
+                    <div class="arrow-inner" style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border-width: 6px; border-style: solid; border-color: transparent transparent #1e1e1e transparent; margin-bottom: -1px;"></div>
+                </div>
+            </div>
+
+            <style>
+                .search-container {
+                    width: 60%;
+                }
+                
+                /* Hover works on Desktop, .show-hybrid works on Mobile Clicks/Taps */
+                .app-tooltip-container:hover .app-tooltip-text,
+                .app-tooltip-text.show-hybrid {
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }
+                
+                /* Mobile specific responsiveness */
+                @media (max-width: 768px) {
+                    .search-container {
+                        width: 82%;
+                    }
+                    .app-tooltip-text {
+                        left: auto !important;
+                        right: -10px !important;
+                        transform: none !important;
+                        width: 220px !important;
+                    }
+                    .app-tooltip-text .arrow-outer {
+                        left: auto !important;
+                        right: 14px !important;
+                        transform: none !important;
+                    }
+                    .app-tooltip-text .arrow-inner {
+                        left: auto !important;
+                        right: 15px !important;
+                        transform: none !important;
+                    }
+                }
+            </style>
+            
+            <script>
+                // Mobile trigger logic: toggle on icon tap, close when tapping outside
+                function toggleHybridTooltip(e) {
+                    e.stopPropagation();
+                    document.getElementById('movie-info-tooltip').classList.toggle('show-hybrid');
+                }
+                window.addEventListener('click', function(e) {
+                    var t = document.getElementById('movie-info-tooltip');
+                    if (t && t.classList.contains('show-hybrid') && !t.contains(e.target)) {
+                        t.classList.remove('show-hybrid');
+                    }
+                });
+            </script>
+        </div>
     </div>
 
-    <div class="form-group" style="text-align: center;">
-      <button class="btn btn-primary btn-block movie-button" style="background-color: #e50914;text-align: center;border-color: #e50914;width:120px;" disabled="true" >Search</button><br><br>
+    <div class="form-group" style="text-align: center; margin-bottom: 25px;">
+      <button class="btn btn-primary btn-block movie-button" style="background-color: #e50914;text-align: center;border-color: #e50914;width:120px; margin: 0 auto;" disabled="true" >Search</button>
     </div>
 
     <!-- Genres Catalog Section -->
-    <div class="genres-container" style="margin-top: 5px; text-align: center; width: 85%; margin-left: auto; margin-right: auto;">
-      <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; padding: 10px;">
-        <a href="/genre?id=28&name=Action%20%26%20Adventure" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Action / Adventure</a>
-        <a href="/genre?id=35&name=Comedy" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Comedy</a>
-        <a href="/genre?id=27&name=Horror" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Horror</a>
-        <a href="/genre?id=878&name=Sci-Fi" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Sci-Fi</a>
-        <a href="/genre?id=10749&name=Romance" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Romance</a>
-        <a href="/genre?id=53&name=Thriller" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555';">Thriller</a>
+    <div class="genres-container" style="position: sticky; top: 25px; z-index: 899; margin-bottom: 30px; margin-top: 15px; text-align: center; pointer-events: none;">
+      <div style="display: inline-flex; justify-content: center; gap: 15px; flex-wrap: wrap; pointer-events: auto; padding: 5px 10px;">
+        <a href="#" onclick="loadGenreView(28, 'Action / Adventure', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Action / Adventure</a>
+        <a href="#" onclick="loadGenreView(35, 'Comedy', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Comedy</a>
+        <a href="#" onclick="loadGenreView(27, 'Horror', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Horror</a>
+        <a href="#" onclick="loadGenreView(878, 'Sci-Fi', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Sci-Fi</a>
+        <a href="#" onclick="loadGenreView(10749, 'Romance', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Romance</a>
+        <a href="#" onclick="loadGenreView(53, 'Thriller', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Thriller</a>
+        <a href="#" onclick="loadGenreView(18, 'Drama', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Drama</a>
+        <a href="#" onclick="loadGenreView(80, 'Crime', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Crime</a>
+        <a href="#" onclick="loadGenreView(9648, 'Mystery', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Mystery</a>
+        <a href="#" onclick="loadGenreView(16, 'Animation', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Animation</a>
+        <a href="#" onclick="loadGenreView(14, 'Fantasy', this); return false;" class="genre-btn btn" style="border-radius: 20px; background-color: #222; color: white; border: 1px solid #555; transition: 0.3s;" onmouseover="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914';}" onmouseout="if(!this.classList.contains('active-genre')) {this.style.backgroundColor='#222'; this.style.borderColor='#555';}">Fantasy</a>
       </div>
     </div>
     
     <!-- Trending Movies Section -->
-    <div class="trending-container" style="position: relative; margin-top: 40px; text-align: center; width: 85%; margin-left: auto; margin-right: auto;">
+    <div class="trending-container" style="position: relative; margin-top: 30px; text-align: center; width: 85%; margin-left: auto; margin-right: auto;">
       <h3 style="color: white; margin-bottom: 25px; text-align: left; padding-left: 20px; font-weight: bold; font-family: 'Noto Sans JP', sans-serif;">🔥 Trending Movies</h3>
       
       <!-- Left Carousel Button -->
@@ -67,6 +193,19 @@
       <button id="scroll-right-btn" style="position: absolute; right: -25px; top: 60%; transform: translateY(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; font-size: 2rem; color: white; cursor: pointer; border-radius: 50%; width: 50px; height: 50px; z-index: 10; display: flex; align-items: center; justify-content: center; transition: all 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.5);" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';">
          <i class="fa fa-angle-right"></i>
       </button>
+    </div>
+    </div>
+    
+    <div id="home-genre-section" style="display: none; padding-top: 20px;">
+      <h3 id="home-genre-title" style="color: white; margin-bottom: 25px; text-align: left; padding-left: 20px; width: 85%; margin-left: auto; margin-right: auto; font-weight: bold; font-family: 'Noto Sans JP', sans-serif;"></h3>
+      <div id="genre-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; padding: 0 40px 20px 40px; margin: 0 auto; width: 100%;">
+         <!-- Movies will load here dynamically -->
+      </div>
+      <center>
+        <button id="load-more-btn" class="btn" style="display: none; color: white; background-color: #222; border: 1px solid #555; font-weight: 600; border-radius: 25px; padding: 10px 30px; margin-bottom: 40px; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='#e50914'; this.style.borderColor='#e50914'; this.style.boxShadow='0 4px 10px rgba(229,9,20,0.5)';" onmouseout="this.style.backgroundColor='#222'; this.style.borderColor='#555'; this.style.boxShadow='none';">
+          Load More <i class="fa fa-angle-down" style="padding-left: 5px;"></i>
+        </button>
+      </center>
     </div>
 	</div>
 
@@ -88,14 +227,14 @@
     $(document).ready(function(){
       var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
       
-      // Convert dataset films to lowercase for exact case-insensitive matching
+      // Normalize film titles
       var lower_films = films.map(f => f.toLowerCase());
       
       var trendingHtml = "";
       var count = 0;
 
       function fetchTrending(page) {
-          if (count >= 15) return; // Display max 15 movies for scroll
+          if (count >= 15) return;
           var trending_url = 'https://api.themoviedb.org/3/movie/popular?api_key=' + my_api_key + '&page=' + page;
           
           $.ajax({
@@ -110,12 +249,12 @@
                 var movie = movies[i];
                 var title = movie.title || movie.original_title;
                 
-                // ONLY append if the movie exists in our local dataset 'films' variable
+                // Filter against local dataset
                 if(lower_films.includes(title.toLowerCase()) && movie.poster_path){
                   var poster_url = "https://image.tmdb.org/t/p/original" + movie.poster_path;
                   
                   trendingHtml += `
-                    <div class="card" style="width: 15rem; flex: 0 0 auto; margin-bottom: 15px;" title="${title}" onclick="recommendcard(this)">
+                    <div class="card" style="width: 15rem; flex: 0 0 auto; margin-bottom: 15px;" title="${title}" data-id="${movie.id}" onclick="recommendcard(this)">
                       <div class="imghvr">
                         <img class="card-img-top" height="360" width="240" alt="${title} - poster" src="${poster_url}">
                         <figcaption class="fig">
@@ -132,13 +271,13 @@
               }
               $('#trending-movies-list').html(trendingHtml);
               
-              // Recursively fetch next page if we haven't found valid movies yet (limit to page 10)
+              // Fetch next page until quota is met
               if (count < 15 && page < 10) {
                 fetchTrending(page + 1);
               }
             },
             error: function(){
-              // Only display error if NO movies were generated at all
+              // Handle strict empty state
               if(count === 0 && page === 1) $('#trending-movies-list').html('<p style="color: white; font-style: italic;">Could not load trending movies at the moment.</p>');
             }
           });
@@ -153,6 +292,195 @@
       
       $('#scroll-right-btn').click(function(){
         document.getElementById('trending-movies-list').scrollBy({ left: 600, behavior: 'smooth' });
+      });
+
+      // Handle genre page redirects to maintain consistent layout flow
+      var pending = localStorage.getItem('pending_movie_recommendation');
+      var pending_id = localStorage.getItem('pending_movie_id');
+      if (pending) {
+        localStorage.removeItem('pending_movie_recommendation');
+        if (pending_id) localStorage.removeItem('pending_movie_id');
+        
+        $('.movie').val(pending);
+        
+        // Trigger exact ID lookup directly avoiding text collision
+        setTimeout(function() { 
+            $('.trending-container').hide();
+            $('.genres-container').hide();
+            $('#home-genre-section').hide();
+            $('#home-btn').fadeIn(300).css('display', 'flex'); 
+            load_details(my_api_key, pending, pending_id); 
+        }, 300);
+      }
+
+      // Dynamic Genre Architecture Injection
+      window.genreId = '';
+      window.genreCurrentPage = 1;
+      window.genreTargetLimit = 12;
+      window.genreCountLoaded = 0;
+      window.genreIsFetching = false;
+      window.genreCurrentMovieIndex = 0;
+      window.genreCurrentMoviesArray = [];
+
+      window.goDirectlyHome = function() {
+          $('.results').hide();
+          $('.fail').hide();
+          $('#home-genre-section').hide();
+          $('html, body').animate({scrollTop: 0}, 'fast');
+          
+          window.genreId = null;
+          window.actorId = null;
+          window.previousGenreId = null;
+          
+          $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
+          
+          $('#autoComplete').val('');
+          $('.genres-container').fadeIn(300);
+          $('.trending-container').fadeIn(300);
+          
+          $('#home-btn').hide();
+          $('#direct-home-btn').hide();
+      }
+
+      window.loadGenreView = function(gid, gname, btn_element) {
+          $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
+          if(btn_element) {
+             $(btn_element).css({'background-color': '#e50914', 'border-color': '#e50914', 'font-weight': 'bold', 'box-shadow': '0 4px 10px rgba(229,9,20,0.5)', 'pointer-events': 'none'}).addClass('active-genre');
+             $('#home-genre-title').text(gname + ' Movies');
+          }
+
+          $('.trending-container').hide();
+          $('.results').hide();
+          $('.fail').hide();
+          $('#home-btn').fadeIn(300).css('display', 'flex'); 
+          $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
+
+          $('#home-genre-section').fadeIn(300);
+          $('#genre-grid').empty();
+          
+          window.actorId = null;
+          window.genreId = gid;
+          window.genreCurrentPage = 1;
+          window.genreTargetLimit = 12;
+          window.genreCountLoaded = 0;
+          window.genreIsFetching = false;
+          window.genreCurrentMovieIndex = 0;
+          window.genreCurrentMoviesArray = [];
+          
+          window.executeGenreLoadCycle();
+      }
+
+      window.loadActorView = function(aid, aname) {
+          $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
+          
+          $('.trending-container').hide();
+          $('.results').hide();
+          $('.fail').hide();
+          $('#home-btn').fadeIn(300).css('display', 'flex'); 
+          $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
+          
+          // Close modal
+          $('.modal').modal('hide');
+          $('body').removeClass('modal-open');
+          $('.modal-backdrop').remove();
+
+          $('#home-genre-section').fadeIn(300);
+          $('#home-genre-title').html('Movies with <span style="color:#e50914;">' + aname + '</span>');
+          $('#genre-grid').empty();
+          
+          // Save their genre state
+          window.previousGenreId = window.genreId;
+          window.genreId = null; 
+          window.actorId = aid;
+          window.genreCurrentPage = 1;
+          window.genreTargetLimit = 12;
+          window.genreCountLoaded = 0;
+          window.genreIsFetching = false;
+          window.genreCurrentMovieIndex = 0;
+          window.genreCurrentMoviesArray = [];
+          
+          window.executeGenreLoadCycle();
+      }
+
+      window.processCachedGenreMovies = function() {
+          var batchHtml = "";
+          while (window.genreCurrentMovieIndex < window.genreCurrentMoviesArray.length && window.genreCountLoaded < window.genreTargetLimit) {
+            var movie = window.genreCurrentMoviesArray[window.genreCurrentMovieIndex];
+            var title = movie.title || movie.original_title;
+            
+            if(movie.poster_path){
+                var poster_url = "https://image.tmdb.org/t/p/original" + movie.poster_path;
+                batchHtml += `
+                <div class="card" style="width: 15rem; margin-bottom: 20px;" title="${title}" data-id="${movie.id}" onclick="recommendcard(this)">
+                    <div class="imghvr">
+                    <img class="card-img-top" height="360" width="240" alt="${title} - poster" src="${poster_url}">
+                    <figcaption class="fig">
+                        <button class="card-btn btn btn-danger"> Click Me </button>
+                    </figcaption>
+                    </div>
+                    <div class="card-body">
+                    <h5 class="card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0;">${title}</h5>
+                    </div>
+                </div>
+                `;
+                window.genreCountLoaded++;
+            }
+            window.genreCurrentMovieIndex++;
+          }
+          
+          $('#genre-grid').append(batchHtml);
+          
+          if (window.genreCountLoaded < window.genreTargetLimit && window.genreCurrentPage < 50) {
+              window.genreCurrentPage++;
+              window.fetchNextApiPageGenre();
+          } else {
+              window.genreIsFetching = false;
+              $('#load-more-btn').html('Load More <i class="fa fa-angle-down" style="padding-left: 5px;"></i>');
+              $('#load-more-btn').show();
+              if (window.genreCurrentPage >= 50) $('#load-more-btn').hide();
+          }
+      }
+
+      window.fetchNextApiPageGenre = function() {
+          var query_url = '';
+          if (window.actorId) {
+             query_url = 'https://api.themoviedb.org/3/discover/movie?api_key=' + my_api_key + '&with_cast=' + window.actorId + '&sort_by=popularity.desc&page=' + window.genreCurrentPage;
+          } else {
+             query_url = 'https://api.themoviedb.org/3/discover/movie?api_key=' + my_api_key + '&with_genres=' + window.genreId + '&sort_by=popularity.desc&page=' + window.genreCurrentPage;
+          }
+          $.ajax({
+            type: 'GET',
+            url: query_url,
+            success: function(response){
+              window.genreCurrentMoviesArray = response.results;
+              window.genreCurrentMovieIndex = 0;
+              window.processCachedGenreMovies();
+            },
+            error: function(){
+              if(window.genreCountLoaded === 0 && window.genreCurrentPage === 1) $('#genre-grid').html('<p style="color: white; font-style: italic;">Could not load genre movies at the moment.</p>');
+              $('#load-more-btn').hide();
+              window.genreIsFetching = false;
+            }
+          });
+      }
+      
+      window.executeGenreLoadCycle = function() {
+          if (window.genreIsFetching) return;
+          window.genreIsFetching = true;
+          $('#load-more-btn').show().html('<i class="fa fa-spinner fa-spin"></i> Loading...');
+          
+          if (window.genreCurrentMovieIndex < window.genreCurrentMoviesArray.length) {
+              window.processCachedGenreMovies();
+          } else {
+              window.fetchNextApiPageGenre();
+          }
+      }
+
+      $('#load-more-btn').on('click', function() {
+        if (!window.genreIsFetching) {
+          window.genreTargetLimit += 12;
+          window.executeGenreLoadCycle();
+        }
       });
     });
   </script>
