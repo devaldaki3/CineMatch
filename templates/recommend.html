@@ -100,16 +100,6 @@
     </div>
 {% endif %}
 
-      {% if not_in_db %}
-      <div class="movie" style="color: #E8E8E8; text-align: center; margin: 30px auto; max-width: 600px;">
-        <div style="background: rgba(229, 9, 20, 0.08); border: 1px solid rgba(229, 9, 20, 0.3); border-radius: 16px; padding: 28px 32px;">
-          <i class="fa fa-database" style="font-size: 2.5rem; color: #e50914; margin-bottom: 14px; display: block;"></i>
-          <h4 style="color: white; font-weight: 700; margin-bottom: 10px;">Not in Our Database</h4>
-          <p style="color: #aaa; font-size: 0.97rem; margin: 0;">This movie is not part of our database, so we can't suggest similar movies.</p>
-        </div>
-      </div>
-      {% else %}
-
       <!-- Loader shown while recommendations are being fetched in background -->
       <div id="rec-loader-section" style="text-align:center; padding: 40px 0;">
         <div style="display:inline-block;">
@@ -126,8 +116,6 @@
 
       <!-- Embedded rec_titles for JS to read -->
       <script>var _rec_titles = {{ rec_titles_json | safe }};</script>
-
-      {% endif %}
 
   <center>
     {% if reviews|length > 0 %}

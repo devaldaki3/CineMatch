@@ -25,51 +25,21 @@
     }
   </style>
   <script type="text/javascript">
-    function restoreHomeView() {
-      var isLookingAtResults = $('.results').is(':visible') && $('.results').children().length > 0;
+    function goDirectlyHome() {
+      $('.results').hide();
+      $('.fail').hide();
+      $('#home-genre-section').hide();
+      $('html, body').animate({scrollTop: 0}, 'fast');
       
-      if (isLookingAtResults) {
-          if (window.movieHistoryStack && window.movieHistoryStack.length > 0) {
-              var previousMovieHtml = window.movieHistoryStack.pop();
-              $('.results').html(previousMovieHtml);
-              $('html, body').animate({scrollTop: 0}, 'fast');
-              return; // User has stepped back to previous movie
-          }
-          
-          $('.results').empty().hide();
-          $('.fail').hide();
-          $('.genres-container').fadeIn(300);
-          
-          if (window.genreId || window.actorId) {
-             $('#home-genre-section').fadeIn(300);
-             $('#home-btn').fadeIn(300).css('display', 'flex'); 
-             $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
-          } else {
-             $('.trending-container').fadeIn(300);
-             $('#home-btn').hide();
-             $('#direct-home-btn').hide();
-          }
-      } else if (window.actorId) {
-          window.actorId = null;
-          
-          if (window.previousGenreId) {
-              window.genreId = window.previousGenreId;
-          }
-          
-          $('#home-genre-section').hide();
-          $('.results').fadeIn(300); 
-          $('#home-btn').fadeIn(300).css('display', 'flex'); 
-          
-      } else {
-          window.genreId = null; 
-          window.actorId = null;
-          
-          $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
-          
-          $('#home-genre-section').hide();
-          $('.trending-container').fadeIn(300);
-          $('#home-btn').hide();
-      }
+      window.genreId = null;
+      window.actorId = null;
+      
+      $('.genre-btn').css({'background-color': '#222', 'border-color': '#555', 'font-weight': 'normal', 'box-shadow': 'none', 'pointer-events': 'auto'}).removeClass('active-genre');
+      
+      $('.trending-container').fadeIn(300);
+      $('.genres-container').fadeIn(300);
+      
+      $('#direct-home-btn').hide();
       
       // Reset the search input value completely in all cases!
       $('.movie').val('');
@@ -81,10 +51,7 @@
 <body id="content" style="font-family: 'Noto Sans JP', sans-serif;">
   <div id="loader"></div>
   <div style="position: sticky; top: 15px; left: 15px; z-index: 1000; display: flex; gap: 10px; width: fit-content;">
-    <!-- Smart Back Button -->
-    <button id="home-btn" class="btn btn-dark" style="display: none; border-radius: 50%; font-size: 1.1rem; font-weight: bold; background-color: rgba(0,0,0,0.8); border: 1px solid #555; align-items: center; justify-content: center; width: 45px; height: 45px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s;" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';" onclick="restoreHomeView()" title="Go Back">
-      <i class="fa fa-arrow-left"></i>
-    </button>
+
     <!-- Direct Home Button -->
     <button id="direct-home-btn" class="btn btn-dark" style="display: none; border-radius: 50%; font-size: 1.2rem; font-weight: bold; background-color: rgba(0,0,0,0.8); border: 1px solid #555; align-items: center; justify-content: center; width: 45px; height: 45px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s;" onmouseover="this.style.background='rgba(229, 9, 20, 0.9)'; this.style.borderColor='#e50914';" onmouseout="this.style.background='rgba(0,0,0,0.8)'; this.style.borderColor='#555';" onclick="goDirectlyHome()" title="Go to Home">
       <i class="fa fa-home"></i>
@@ -220,7 +187,7 @@
     <center><h3>Sorry! The Requested Movie is not in our Database</h3></center>
   </div>
 
-	<div class="results">
+	<div class="results" style="display: none;">
     <center>
       <h2 id="name" class="text-uppercase"></h2>
     </center>
@@ -315,7 +282,7 @@
             $('.trending-container').hide();
             $('.genres-container').hide();
             $('#home-genre-section').hide();
-            $('#home-btn').fadeIn(300).css('display', 'flex'); 
+            $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
             load_details(my_api_key, pending, pending_id); 
         }, 300);
       }
@@ -345,8 +312,6 @@
           $('#autoComplete').val('');
           $('.genres-container').fadeIn(300);
           $('.trending-container').fadeIn(300);
-          
-          $('#home-btn').hide();
           $('#direct-home-btn').hide();
       }
 
@@ -360,7 +325,6 @@
           $('.trending-container').hide();
           $('.results').hide();
           $('.fail').hide();
-          $('#home-btn').fadeIn(300).css('display', 'flex'); 
           $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
 
           $('#home-genre-section').fadeIn(300);
@@ -384,7 +348,6 @@
           $('.trending-container').hide();
           $('.results').hide();
           $('.fail').hide();
-          $('#home-btn').fadeIn(300).css('display', 'flex'); 
           $('#direct-home-btn').fadeIn(300).css('display', 'flex'); 
           
           // Close modal

@@ -83,12 +83,7 @@ def _rcmd_cached(m, tmdb_id):
         print("rcmd error: ", e)
         return []
 
-# Converting string like '["abc","def"]' to a proper Python list
-def convert_to_list(my_list):
-    my_list = my_list.split('","')
-    my_list[0] = my_list[0].replace('["','')
-    my_list[-1] = my_list[-1].replace('"]','')
-    return my_list
+
 
 def get_suggestions():
     try:

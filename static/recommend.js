@@ -1,11 +1,9 @@
 $(function() {
-  // Disable search until input contains values
   const source = document.getElementById('autoComplete');
   const inputHandler = function(e) {
     if(e.target.value==""){
       $('.movie-button').attr('disabled', true);
-    }
-    else{
+    } else {
       $('.movie-button').attr('disabled', false);
     }
   }
@@ -18,25 +16,20 @@ $(function() {
     if (title=="") {
       $('.results').css('display','none');
       $('.fail').css('display','block');
-    }
-    else{
+    } else {
       load_details(title);
     }
   });
 });
 
-// Triggered when any movie card is clicked
 function recommendcard(e){
   var title = e.getAttribute('title');
   var explicit_id = e.getAttribute('data-id');
-  
   $('.fail').hide();
   $('#loader').fadeIn();
-  
   load_details(title, explicit_id);
 }
 
-// Step 1: Resolve TMDB ID, then kick off parallel calls
 function load_details(title, explicit_id=null){
   var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
 
@@ -54,7 +47,6 @@ function load_details(title, explicit_id=null){
         } else {
           $("#loader").fadeIn();
           $('.fail').css('display','none');
-
           var best_movie = movie.results[0];
           var max_votes = -1;
           for (var i = 0; i < movie.results.length; i++) {
@@ -63,7 +55,6 @@ function load_details(title, explicit_id=null){
               best_movie = movie.results[i];
             }
           }
-
           movie_recs(title, best_movie.id, my_api_key);
         }
       },
@@ -75,10 +66,8 @@ function load_details(title, explicit_id=null){
   }
 }
 
-// Step 2: Fire /similarity and /get_details IN PARALLEL for max speed
 function movie_recs(movie_title, movie_id, my_api_key){
 
-  // Fire both calls at the exact same time
   var similarity_promise = $.ajax({
     type: 'POST',
     url: "/similarity",
@@ -93,27 +82,16 @@ function movie_recs(movie_title, movie_id, my_api_key){
     dataType: 'html'
   });
 
-  // When details finish (~2-3s) — show the page IMMEDIATELY without waiting for recommendations!
   details_promise.done(function(response){
     $("#loader").fadeOut();
     $('.trending-container').hide();
     $('.genres-container').hide();
     $('#home-genre-section').hide();
-    $('#home-btn').fadeIn(300).css('display', 'flex');
     $('#direct-home-btn').fadeIn(300).css('display', 'flex');
-
-    window.movieHistoryStack = window.movieHistoryStack || [];
-    if ($('.results').is(':visible') && $('.results').html().trim().length > 0) {
-      if (!window.movieHistoryStack.length || window.movieHistoryStack[window.movieHistoryStack.length-1] !== $('.results').html()) {
-        window.movieHistoryStack.push($('.results').html());
-      }
-    }
-
     $('.results').html(response).show();
     $('#autoComplete').val('');
     $(window).scrollTop(0);
 
-    // Now wait for /similarity to finish, then fetch posters in background
     similarity_promise.done(function(recs){
       if(recs === "__NOT_IN_DB__" || !recs){
         $('#rec-loader-section').hide();
@@ -122,18 +100,18 @@ function movie_recs(movie_title, movie_id, my_api_key){
           '<div style="background:rgba(229,9,20,0.08);border:1px solid rgba(229,9,20,0.3);border-radius:16px;padding:28px 32px;">' +
           '<i class="fa fa-database" style="font-size:2.5rem;color:#e50914;margin-bottom:14px;display:block;"></i>' +
           '<h4 style="color:white;font-weight:700;margin-bottom:10px;">Not in Our Database</h4>' +
-          '<p style="color:#aaa;font-size:0.97rem;margin:0;">This movie is not part of our dataset, so we can\'t suggest similar movies.</p>' +
+          '<p style="color:#aaa;font-size:0.97rem;margin:0;">This movie is not part of our database, so we can\'t suggest similar movies.</p>' +
           '</div></div>'
         ).show();
         return;
       }
+
       var movie_arr = recs.split('---').filter(Boolean);
       if(movie_arr.length === 0){
         $('#rec-loader-section').hide();
         return;
       }
 
-      // Fetch all 10 recommendation posters from dedicated parallel endpoint
       $.ajax({
         type: 'POST',
         url: '/get_rec_posters',
@@ -160,7 +138,6 @@ function movie_recs(movie_title, movie_id, my_api_key){
           }
           html += '</div>';
 
-          // Hide spinner, inject cards
           $('#rec-loader-section').hide();
           $('#rec-inject-section').html(html).show();
         },
