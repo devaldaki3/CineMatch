@@ -25,6 +25,9 @@ try:
     norms[norms == 0] = 1  # Avoid division by zero
     similarity_matrix = raw_matrix.multiply(1 / norms[:, np.newaxis])
     similarity_matrix = sp.csr_matrix(similarity_matrix)
+    
+    # Pre-extract vote_averages array for lighting fast Numpy access later (~1ms)
+    vote_averages = np.array(data['vote_average'].fillna(5.0).astype(float).values)
     print("Models loaded successfully.")
 except Exception as e:
     print(f"Error loading models: {e}")
@@ -49,24 +52,17 @@ def _rcmd_cached(m, tmdb_id):
         target_lang = data.iloc[i]['original_language']
 
         # Fast dot product (pre-normalized at startup = cosine similarity)
-        sim_scores = similarity_matrix.dot(similarity_matrix[i].T).toarray().flatten().tolist()
-        lst = list(enumerate(sim_scores))
+        sim_scores_np = similarity_matrix.dot(similarity_matrix[i].T).toarray().flatten()
 
-        # Hybrid Scoring: 75% content + 25% popularity
-        def calculate_hybrid_score(item):
-            try:
-                vote = float(data.iloc[item[0]]['vote_average'])
-            except:
-                vote = 5.0
-            return (item[1] * 0.75) + ((vote / 10.0) * 0.25)
+        # Vectorized Hybrid Scoring: 75% content + 25% popularity in pure Numpy (~1ms)
+        hybrid_scores = (sim_scores_np * 0.75) + ((vote_averages / 10.0) * 0.25)
 
-        lst = sorted(lst, key=calculate_hybrid_score, reverse=True)
-        search_pool = lst[1:500]
+        # Get top 500 indices instantly using argsort
+        top_indices = np.argsort(hybrid_scores)[::-1][1:500].tolist()
 
         l = []
         # Phase 1: Same-language
-        for item in search_pool:
-            a = item[0]
+        for a in top_indices:
             rec_title = data.iloc[a]['title']
             if rec_title.lower() != m and data.iloc[a]['original_language'] == target_lang:
                 l.append(rec_title)
@@ -75,8 +71,8 @@ def _rcmd_cached(m, tmdb_id):
 
         # Phase 2: Fill remaining with any language
         if len(l) < 10:
-            for item in search_pool:
-                rec_title = data.iloc[item[0]]['title']
+            for a in top_indices:
+                rec_title = data.iloc[a]['title']
                 if rec_title.lower() != m and rec_title not in l:
                     l.append(rec_title)
                 if len(l) == 10:
@@ -186,20 +182,14 @@ def get_details():
     suggestions = get_suggestions()
 
     with ThreadPoolExecutor(max_workers=16) as ex:
-        # Fire all TMDB calls simultaneously
+        # Fire movie/cast/review calls simultaneously (NO poster fetching here)
         fut_movie   = ex.submit(tmdb_get, f'movie/{movie_id}')
         fut_credits = ex.submit(tmdb_get, f'movie/{movie_id}/credits')
         fut_reviews = ex.submit(tmdb_get, f'movie/{movie_id}/reviews')
-        fut_posters = {ex.submit(fetch_poster_for_title, t): t for t in rec_titles}
 
         movie_details = fut_movie.result()
         credits_data  = fut_credits.result()
         reviews_data  = fut_reviews.result()
-
-        # Collect rec posters in order
-        poster_results = {}
-        for fut, title in fut_posters.items():
-            poster_results[title] = fut.result()
 
     if not movie_details:
         return "Error fetching movie details from TMDB.", 500
@@ -259,16 +249,8 @@ def get_details():
                 print('Sentiment error:', e)
     movie_reviews = dict(zip(reviews_list, reviews_status))
 
-    # -- Recommended movie cards --
-    rec_movies, rec_poster_urls, rec_ids_list = [], [], []
-    for t in rec_titles:
-        p_url, p_id = poster_results.get(t, ('', ''))
-        rec_movies.append(t)
-        rec_poster_urls.append(p_url)
-        rec_ids_list.append(p_id)
-
-    movie_cards = {(rec_poster_urls[i], str(rec_ids_list[i])): rec_movies[i]
-                   for i in range(len(rec_movies))}
+    # Pass rec_titles to template as embedded JSON for JS to pick up
+    movie_cards = {}  # JS will inject recommendations dynamically after separate /get_rec_posters call
     casts = {cast_names[i]: [cast_ids[i], cast_chars[i], cast_profiles[i]]
              for i in range(len(cast_names))}
     cast_details_dict = {cast_names[i]: [cast_ids[i], cast_profiles[i], cast_bdays[i], cast_places[i], cast_bios[i]]
@@ -279,11 +261,35 @@ def get_details():
         vote_average=vote_average, vote_count=vote_count,
         release_date=release_date, runtime=runtime, status=status,
         genres=genres, movie_cards=movie_cards, reviews=movie_reviews,
-        casts=casts, cast_details=cast_details_dict, not_in_db=not_in_db)
+        casts=casts, cast_details=cast_details_dict, not_in_db=not_in_db,
+        rec_titles_json=json.dumps(list(rec_titles)))
 
-    # Store in cache for instant repeat searches
     _details_cache[cache_key] = result
     return result
+
+@app.route("/get_rec_posters", methods=["POST"])
+def get_rec_posters():
+    """Separate fast endpoint: fetch posters for 10 recommended movies in parallel."""
+    payload = request.get_json()
+    rec_titles_list = payload.get('rec_titles', [])
+
+    if not rec_titles_list:
+        return json.dumps({'movies': [], 'posters': [], 'ids': []})
+
+    poster_results = {}
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        fut_map = {ex.submit(fetch_poster_for_title, t): t for t in rec_titles_list}
+        for fut, t in fut_map.items():
+            poster_results[t] = fut.result()
+
+    movies, posters, ids = [], [], []
+    for t in rec_titles_list:
+        p_url, p_id = poster_results.get(t, ('', ''))
+        movies.append(t)
+        posters.append(p_url)
+        ids.append(str(p_id))
+
+    return json.dumps({'movies': movies, 'posters': posters, 'ids': ids})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))

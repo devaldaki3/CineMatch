@@ -13,11 +13,7 @@ $(function() {
 
   $('.movie-button').on('click',function(){
     var title = $('.movie').val();
-    
-    $('.trending-container').hide();
-    $('.genres-container').hide();
-    $('#home-genre-section').hide();
-    $('#home-btn').fadeIn(300).css('display', 'flex'); 
+    $('#loader').fadeIn();
     
     if (title=="") {
       $('.results').css('display','none');
@@ -40,16 +36,13 @@ function recommendcard(e){
   load_details(title, explicit_id);
 }
 
-// Step 1: Get similarity recommendations from our backend
+// Step 1: Resolve TMDB ID, then kick off parallel calls
 function load_details(title, explicit_id=null){
   var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
 
-  // First, resolve TMDB ID
   if (explicit_id && explicit_id !== "null" && explicit_id !== "undefined") {
-    // We already have the ID — go straight to similarity + details
     movie_recs(title, explicit_id, my_api_key);
   } else {
-    // Search TMDB for the movie to get its ID
     $.ajax({
       type: 'GET',
       url: 'https://api.themoviedb.org/3/search/movie?api_key=' + my_api_key + '&query=' + encodeURIComponent(title),
@@ -62,7 +55,6 @@ function load_details(title, explicit_id=null){
           $("#loader").fadeIn();
           $('.fail').css('display','none');
 
-          // Pick result with most votes to avoid obscure title collisions
           var best_movie = movie.results[0];
           var max_votes = -1;
           for (var i = 0; i < movie.results.length; i++) {
@@ -83,56 +75,108 @@ function load_details(title, explicit_id=null){
   }
 }
 
-// Step 2: POST to our Flask /similarity, then send everything to /get_details
+// Step 2: Fire /similarity and /get_details IN PARALLEL for max speed
 function movie_recs(movie_title, movie_id, my_api_key){
-  $.ajax({
+
+  // Fire both calls at the exact same time
+  var similarity_promise = $.ajax({
     type: 'POST',
     url: "/similarity",
-    data: {'name': movie_title, 'movie_id': movie_id},
-    success: function(recs){
-      var not_in_db = false;
-      var movie_arr = [];
+    data: {'name': movie_title, 'movie_id': movie_id}
+  });
 
-      if(recs === "__NOT_IN_DB__"){
-        not_in_db = true;
-      } else {
-        movie_arr = recs.split('---').filter(Boolean);
+  var details_promise = $.ajax({
+    type: 'POST',
+    url: "/get_details",
+    contentType: 'application/json',
+    data: JSON.stringify({ movie_id: movie_id, rec_titles: [], not_in_db: false }),
+    dataType: 'html'
+  });
+
+  // When details finish (~2-3s) — show the page IMMEDIATELY without waiting for recommendations!
+  details_promise.done(function(response){
+    $("#loader").fadeOut();
+    $('.trending-container').hide();
+    $('.genres-container').hide();
+    $('#home-genre-section').hide();
+    $('#home-btn').fadeIn(300).css('display', 'flex');
+    $('#direct-home-btn').fadeIn(300).css('display', 'flex');
+
+    window.movieHistoryStack = window.movieHistoryStack || [];
+    if ($('.results').is(':visible') && $('.results').html().trim().length > 0) {
+      if (!window.movieHistoryStack.length || window.movieHistoryStack[window.movieHistoryStack.length-1] !== $('.results').html()) {
+        window.movieHistoryStack.push($('.results').html());
+      }
+    }
+
+    $('.results').html(response).show();
+    $('#autoComplete').val('');
+    $(window).scrollTop(0);
+
+    // Now wait for /similarity to finish, then fetch posters in background
+    similarity_promise.done(function(recs){
+      if(recs === "__NOT_IN_DB__" || !recs){
+        $('#rec-loader-section').hide();
+        $('#rec-inject-section').html(
+          '<div class="movie" style="color:#E8E8E8;text-align:center;margin:30px auto;max-width:600px;">' +
+          '<div style="background:rgba(229,9,20,0.08);border:1px solid rgba(229,9,20,0.3);border-radius:16px;padding:28px 32px;">' +
+          '<i class="fa fa-database" style="font-size:2.5rem;color:#e50914;margin-bottom:14px;display:block;"></i>' +
+          '<h4 style="color:white;font-weight:700;margin-bottom:10px;">Not in Our Database</h4>' +
+          '<p style="color:#aaa;font-size:0.97rem;margin:0;">This movie is not part of our dataset, so we can\'t suggest similar movies.</p>' +
+          '</div></div>'
+        ).show();
+        return;
+      }
+      var movie_arr = recs.split('---').filter(Boolean);
+      if(movie_arr.length === 0){
+        $('#rec-loader-section').hide();
+        return;
       }
 
-      // Step 3: Send movie_id + rec titles to backend — backend does ALL TMDB fetching in parallel
-      var payload = {
-          movie_id: movie_id,
-          rec_titles: movie_arr,
-          not_in_db: not_in_db
-      };
-      console.log('[CineMatch] /get_details payload:', payload);
+      // Fetch all 10 recommendation posters from dedicated parallel endpoint
       $.ajax({
         type: 'POST',
-        url: "/get_details",
+        url: '/get_rec_posters',
         contentType: 'application/json',
-        data: JSON.stringify(payload),
-        dataType: 'html',
-        complete: function(){
-          $("#loader").delay(300).fadeOut();
-        },
-        success: function(response){
-          $('.trending-container').hide();
-          $('.genres-container').hide();
-          $('#home-genre-section').hide();
-          $('#home-btn').fadeIn(300).css('display', 'flex');
-          $('.results').html(response).show();
-          $('#autoComplete').val('');
-          $(window).scrollTop(0);
+        data: JSON.stringify({rec_titles: movie_arr}),
+        success: function(data){
+          var result = JSON.parse(data);
+          var movies = result.movies;
+          var posters = result.posters;
+          var ids = result.ids;
+
+          var html = '<div class="movie" style="color: #E8E8E8;">';
+          html += '<center><h3>RECOMMENDED MOVIES FOR YOU</h3>';
+          html += '<h5>(Click any of the movies to get recommendation)</h5></center></div>';
+          html += '<div class="movie-content">';
+          for(var i = 0; i < movies.length; i++){
+            html += '<div class="card" style="width: 15rem;" title="' + movies[i] + '" data-id="' + ids[i] + '" onclick="recommendcard(this)">';
+            html += '<div class="imghvr">';
+            html += '<img class="card-img-top" height="360" width="240" alt="' + movies[i] + ' - poster" src="' + posters[i] + '">';
+            html += '<figcaption class="fig"><button class="card-btn btn btn-danger">Click Me</button></figcaption>';
+            html += '</div>';
+            html += '<div class="card-body"><h5 class="card-title">' + movies[i] + '</h5></div>';
+            html += '</div>';
+          }
+          html += '</div>';
+
+          // Hide spinner, inject cards
+          $('#rec-loader-section').hide();
+          $('#rec-inject-section').html(html).show();
         },
         error: function(){
-          alert("Error loading movie details.");
-          $("#loader").delay(500).fadeOut();
+          $('#rec-loader-section').hide();
         }
       });
-    },
-    error: function(){
-      alert("Error getting recommendations.");
-      $("#loader").delay(500).fadeOut();
-    },
+    });
+
+    similarity_promise.fail(function(){
+      $('#rec-loader-section').hide();
+    });
+  });
+
+  details_promise.fail(function(){
+    alert("Error loading movie details.");
+    $("#loader").fadeOut();
   });
 }

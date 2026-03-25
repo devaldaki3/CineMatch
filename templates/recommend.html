@@ -108,30 +108,26 @@
           <p style="color: #aaa; font-size: 0.97rem; margin: 0;">This movie is not part of our database, so we can't suggest similar movies.</p>
         </div>
       </div>
-      {% elif movie_cards|length > 1 %}
+      {% else %}
 
-      <div class="movie" style="color: #E8E8E8;">
-      <center><h3>RECOMMENDED MOVIES FOR YOU</h3><h5>(Click any of the movies to get recommendation)</h5></center>
-    </div>
-
-    <div class="movie-content">
-      {% for poster_id_pair, title in movie_cards.items() if not movie_cards.hidden %}
-        {% set poster = poster_id_pair[0] %}
-        {% set tmdb_id = poster_id_pair[1] %}
-        <div class="card" style="width: 15rem;" title="{{title}}" data-id="{{tmdb_id}}" onclick="recommendcard(this)">
-          <div class="imghvr">
-            <img class="card-img-top" height="360" width="240" alt="{{title}} - poster" src={{poster}}>
-            <figcaption class="fig">
-              <button class="card-btn btn btn-danger"> Click Me </button>
-            </figcaption>
-           </div>
-          <div class="card-body">
-            <h5 class="card-title">{{title|capitalize}}</h5>
-          </div>
+      <!-- Loader shown while recommendations are being fetched in background -->
+      <div id="rec-loader-section" style="text-align:center; padding: 40px 0;">
+        <div style="display:inline-block;">
+          <div style="width:3rem; height:3rem; border: 4px solid #333; border-top: 4px solid #e50914; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+          <p style="color: #aaa; margin-top: 15px; font-size: 1rem;">
+            <i class="fa fa-film" style="color:#e50914; margin-right: 6px;"></i>
+            Gathering the best picks for you...
+          </p>
         </div>
-    {% endfor %}
-    </div>
-    {% endif %}
+      </div>
+
+      <!-- JS injects recommendation cards here -->
+      <div id="rec-inject-section" style="display:none;"></div>
+
+      <!-- Embedded rec_titles for JS to read -->
+      <script>var _rec_titles = {{ rec_titles_json | safe }};</script>
+
+      {% endif %}
 
   <center>
     {% if reviews|length > 0 %}

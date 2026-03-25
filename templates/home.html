@@ -29,6 +29,13 @@
       var isLookingAtResults = $('.results').is(':visible') && $('.results').children().length > 0;
       
       if (isLookingAtResults) {
+          if (window.movieHistoryStack && window.movieHistoryStack.length > 0) {
+              var previousMovieHtml = window.movieHistoryStack.pop();
+              $('.results').html(previousMovieHtml);
+              $('html, body').animate({scrollTop: 0}, 'fast');
+              return; // User has stepped back to previous movie
+          }
+          
           $('.results').empty().hide();
           $('.fail').hide();
           $('.genres-container').fadeIn(300);
@@ -323,6 +330,7 @@
       window.genreCurrentMoviesArray = [];
 
       window.goDirectlyHome = function() {
+          window.movieHistoryStack = [];
           $('.results').hide();
           $('.fail').hide();
           $('#home-genre-section').hide();
