@@ -19,14 +19,14 @@ try:
     movies_dict = pickle.load(open('models/movie_dict.pkl', 'rb'))
     data = pd.DataFrame(movies_dict)
     
-    # Pre-normalize sparse vectors at startup for fast dot product later
+    # Pre-normalize sparse vectors at startup
     raw_matrix = sp.load_npz('models/vectors.npz')
     norms = np.array(raw_matrix.multiply(raw_matrix).sum(axis=1)).flatten() ** 0.5
     norms[norms == 0] = 1  # Avoid division by zero
     similarity_matrix = raw_matrix.multiply(1 / norms[:, np.newaxis])
     similarity_matrix = sp.csr_matrix(similarity_matrix)
     
-    # Pre-extract vote_averages array for lighting fast Numpy access later (~1ms)
+    # Pre-extract vote_averages array
     vote_averages = np.array(data['vote_average'].fillna(5.0).astype(float).values)
     print("Models loaded successfully.")
 except Exception as e:
@@ -38,7 +38,6 @@ def rcmd(m, tmdb_id=None):
 @lru_cache(maxsize=512)
 def _rcmd_cached(m, tmdb_id):
     try:
-        # Prefer TMDB ID match for accuracy; fallback to title search
         if tmdb_id is not None:
             if tmdb_id not in data['movie_id'].values:
                 return '__NOT_IN_DB__'
@@ -51,13 +50,13 @@ def _rcmd_cached(m, tmdb_id):
 
         target_lang = data.iloc[i]['original_language']
 
-        # Fast dot product (pre-normalized at startup = cosine similarity)
+        # dot product
         sim_scores_np = similarity_matrix.dot(similarity_matrix[i].T).toarray().flatten()
 
-        # Vectorized Hybrid Scoring: 75% content + 25% popularity in pure Numpy (~1ms)
+        # Vectorized Hybrid Scoring: 75% content + 25% popularity
         hybrid_scores = (sim_scores_np * 0.75) + ((vote_averages / 10.0) * 0.25)
 
-        # Get top 500 indices instantly using argsort
+        # Get top 500 indices using argsort
         top_indices = np.argsort(hybrid_scores)[::-1][1:500].tolist()
 
         l = []
@@ -166,10 +165,9 @@ _details_cache = {}
 def get_details():
     payload = request.get_json()
     movie_id   = payload.get('movie_id')
-    rec_titles = tuple(payload.get('rec_titles', []))  # make hashable
+    rec_titles = tuple(payload.get('rec_titles', []))
     not_in_db  = payload.get('not_in_db', False)
 
-    # ── Cache hit: return instantly ──────────────────────────────────────
     cache_key = (movie_id, rec_titles)
     if cache_key in _details_cache:
         return _details_cache[cache_key]
@@ -177,7 +175,7 @@ def get_details():
     suggestions = get_suggestions()
 
     with ThreadPoolExecutor(max_workers=16) as ex:
-        # Fire movie/cast/review calls simultaneously (NO poster fetching here)
+        # movie/cast/review calls simultaneously
         fut_movie   = ex.submit(tmdb_get, f'movie/{movie_id}')
         fut_credits = ex.submit(tmdb_get, f'movie/{movie_id}/credits')
         fut_reviews = ex.submit(tmdb_get, f'movie/{movie_id}/reviews')

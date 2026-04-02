@@ -17,7 +17,7 @@
 ## 📸 Demo
 ![CineMatch Demo](static/demo.gif)
 
----
+--- 
 
 ## 📖 Overview
 **CineMatch** eliminates the paradox of choice for movie nights. By simply searching for a movie you love, our hybrid Machine Learning engine instantly generates 10 highly accurate recommendations. Engineered for a premium user experience, the system seamlessly pulls dynamic metadata (posters, runtime, genres, cast profiles) and real-time audience reviews from the TMDb API. These reviews are then fed through a trained N-Gram text classifier to immediately gauge public sentiment (*Good* or *Bad*).
